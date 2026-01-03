@@ -192,8 +192,67 @@ const registerFCMToken = async (req, res, next) => {
   }
 };
 
+const unregisterFCMToken = async (req, res, next) => {
+  try {
+    const { empId, fcmToken } = req.body;
+
+    console.log(`\n📱 ============================================`);
+    console.log(`📱 FCM TOKEN UNREGISTRATION REQUEST`);
+    console.log(`📱 ============================================`);
+    console.log(`empId: ${empId}`);
+    console.log(`fcmToken: ${fcmToken ? fcmToken.substring(0, 30) + '...' : 'MISSING'}`);
+
+    if (!empId || !fcmToken) {
+      console.log(`❌ Missing required fields`);
+      return res.status(400).json({
+        success: false,
+        message: 'empId and fcmToken are required'
+      });
+    }
+
+    // Try to find user by empId or loginId
+    const user = await User.findOne({ 
+      $or: [
+        { empId: String(empId) },
+        { loginId: String(empId) }
+      ]
+    });
+
+    if (!user) {
+      console.log(`❌ User not found for empId/loginId: ${empId}`);
+      console.log(`📱 ============================================\n`);
+      return res.status(404).json({
+        success: false,
+        message: 'User not found.'
+      });
+    }
+
+    console.log(`✅ User found: ${user.name} (empId: ${user.empId}, loginId: ${user.loginId})`);
+    console.log(`Current FCM tokens count: ${user.fcmTokens ? user.fcmTokens.length : 0}`);
+    console.log(`Current single fcmToken: ${user.fcmToken ? user.fcmToken.substring(0, 30) + '...' : 'null'}`);
+
+    // Remove the FCM token using the User model method (handles both fcmToken and fcmTokens)
+    await user.removeFCMToken(fcmToken);
+
+    console.log(`✅ FCM token removed. New tokens count: ${user.fcmTokens ? user.fcmTokens.length : 0}`);
+    console.log(`New single fcmToken: ${user.fcmToken ? user.fcmToken.substring(0, 30) + '...' : 'null'}`);
+    console.log(`📱 ============================================\n`);
+
+    res.json({
+      success: true,
+      message: 'FCM token unregistered successfully',
+      tokensCount: user.fcmTokens ? user.fcmTokens.length : 0
+    });
+  } catch (error) {
+    console.error(`❌ FCM token unregistration error: ${error.message}`);
+    console.log(`📱 ============================================\n`);
+    next(error);
+  }
+};
+
 module.exports = {
   syncUser,
-  registerFCMToken
+  registerFCMToken,
+  unregisterFCMToken
 };
 
