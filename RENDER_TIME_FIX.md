@@ -45,13 +45,47 @@ Sometimes a fresh deploy resets the container time:
 4. **Check logs** - Look for "System Time Check" output
 5. **If still 2026**, proceed to Option 1
 
-### Option 3: Check Environment/Timezone Settings
+### Option 3: Set Timezone to UTC (Step-by-Step)
 
-1. **Render Dashboard → Your Service → Environment**
-2. **Check for timezone-related environment variables:**
-   - `TZ` (should be `UTC` or `America/New_York`, etc.)
-   - If missing, add: `TZ=UTC`
-3. **Save and redeploy**
+**This is the most common fix for time issues on Render:**
+
+1. **Go to Render Dashboard:**
+   - https://dashboard.render.com
+   - Navigate to your service (the chat backend service)
+
+2. **Open Environment Variables:**
+   - Click on your service
+   - Go to the "Environment" tab (in the left sidebar)
+   - Or click "Environment" button at the top
+
+3. **Add Timezone Variable:**
+   - Click "Add Environment Variable" or the "+" button
+   - **Key:** `TZ`
+   - **Value:** `UTC`
+   - Click "Save Changes"
+
+4. **Redeploy:**
+   - Go to "Manual Deploy" tab
+   - Click "Clear build cache & deploy"
+   - Wait for deployment to complete
+
+5. **Verify:**
+   - Check logs after deployment
+   - Look for "System Time Check" output
+   - Should show: `Timezone: UTC` ✅
+
+**Visual Guide:**
+```
+Render Dashboard
+  → Your Service (chat-backend)
+    → Environment (tab)
+      → Add Environment Variable
+        Key: TZ
+        Value: UTC
+      → Save Changes
+    → Manual Deploy
+      → Clear build cache & deploy
+```
 
 ### Option 4: Verify Time After Fix
 

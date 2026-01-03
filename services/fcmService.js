@@ -190,26 +190,26 @@ const sendNotification = async (empId, notification) => {
             console.error(`   If actual current time doesn't match server time, Firebase JWT will fail.`);
             console.error(`\n   🔧 FIX: Set TZ=UTC in Render and redeploy.`);
           } else {
-            console.error(`\nDiagnosis:`);
-            console.error(`   Since Firebase Console testing works, your FCM tokens are valid.`);
-            console.error(`   The issue is likely with the backend service account key or clock synchronization.`);
-            console.error(`   "Invalid JWT Signature" usually means:`);
-            console.error(`   1. Server time has clock skew (check above - should be < 5 minutes)`);
-            console.error(`   2. Service account key was revoked in Google Cloud Console`);
-            console.error(`   3. Service account key is corrupted or incomplete`);
-            console.error(`   4. Private key format is wrong (should start with "-----BEGIN PRIVATE KEY-----")`);
-            console.error(`   5. Timezone mismatch (server should use UTC)`);
+            // Time is correct, so issue is definitely the service account key
+            console.error(`\n🔍 DIAGNOSIS: Time is correct, so issue is the SERVICE ACCOUNT KEY`);
+            console.error(`   Your server time is accurate (clock skew: 0s, timezone: UTC)`);
+            console.error(`   "Invalid JWT Signature" with correct time = KEY PROBLEM`);
+            console.error(`\n   Most likely causes:`);
+            console.error(`   1. ❌ Service account key was REVOKED in Google Cloud Console`);
+            console.error(`   2. ❌ Service account key is CORRUPTED (missing newlines, truncated)`);
+            console.error(`   3. ❌ Service account key is from WRONG PROJECT`);
+            console.error(`   4. ❌ Key file on Render is DIFFERENT from local (not uploaded correctly)`);
+            console.error(`   5. ❌ Key was regenerated but OLD key is still on Render`);
             
-            console.error(`\nSolution:`);
-            console.error(`   1. FIRST: Ensure server time is synced (clock skew < 5 minutes)`);
-            console.error(`   2. Set server timezone to UTC if not already`);
-            console.error(`   3. Go to: https://console.cloud.google.com/iam-admin/serviceaccounts?project=wisdom-7c115`);
-            console.error(`   4. Find: firebase-adminsdk-fbsvc@wisdom-7c115.iam.gserviceaccount.com`);
-            console.error(`   5. Click on it → "Keys" tab`);
-            console.error(`   6. Check if the key exists and is active`);
-            console.error(`   7. If revoked/missing: Generate new key from Firebase Console`);
-            console.error(`   8. Replace chat-backend/firebase-service-account.json`);
-            console.error(`   9. Restart backend server`);
+            console.error(`\n   ✅ SOLUTION: Regenerate Service Account Key`);
+            console.error(`   1. Go to: https://console.firebase.google.com/project/wisdom-7c115/settings/serviceaccounts/adminsdk`);
+            console.error(`   2. Click "Generate new private key"`);
+            console.error(`   3. Download the JSON file`);
+            console.error(`   4. For Render: Upload to your repo as firebase-service-account.json`);
+            console.error(`      OR: Set as environment variable (base64 encoded)`);
+            console.error(`   5. Redeploy on Render (Manual Deploy → Clear cache & deploy)`);
+            console.error(`   6. Verify in logs: Should see "Firebase Admin SDK initialized successfully"`);
+            console.error(`\n   📋 See FIREBASE_KEY_REGENERATION.md for detailed steps`);
           }
           console.error(`❌ ============================================\n`);
           // Don't try other tokens if credential is invalid
