@@ -117,10 +117,44 @@ const getChatRooms = async (req, res, next) => {
       rooms.map(async (room) => {
         // Handle group chats differently
         if (room.type === 'group') {
-          // For group chats, return room info without otherUser
+          // For group chats, get online status for all participants
+          const participantsStr = room.participants.map(p => String(p));
+          const participantsStatus = {};
+          let onlineCount = 0;
+          
+          for (const participantId of participantsStr) {
+            const participantIdStr = String(participantId);
+            const participant = await User.findOne({
+              $or: [
+                { empId: participantIdStr },
+                { loginId: participantIdStr }
+              ]
+            }).select('empId loginId name isOnline').lean();
+            
+            if (participant) {
+              const isOnline = participant.isOnline || false;
+              participantsStatus[participantIdStr] = {
+                empId: String(participant.empId),
+                name: participant.name,
+                isOnline: isOnline
+              };
+              if (isOnline) {
+                onlineCount++;
+              }
+            }
+          }
+          
+          const participantsOnlineStatus = {
+            participants: participantsStatus,
+            onlineCount: onlineCount,
+            totalCount: participantsStr.length
+          };
+          
+          // For group chats, return room info with participantsOnlineStatus
           return {
             ...room.toObject(),
             otherUser: null, // Groups don't have a single "other user"
+            participantsOnlineStatus: participantsOnlineStatus,
           };
         }
 
