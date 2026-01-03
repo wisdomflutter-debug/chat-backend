@@ -149,47 +149,52 @@ const sendNotification = async (empId, notification) => {
           }
           
           const systemTime = new Date();
-          const currentYear = systemTime.getFullYear();
-          const expectedYear = 2024; // Update this to current year
+          const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+          const timeSkew = Math.abs(systemTime.getTime() - Date.now());
+          const maxAllowedSkew = 5 * 60 * 1000; // 5 minutes
           
           console.error(`\nServer Time Check:`);
           console.error(`   Current UTC: ${systemTime.toISOString()}`);
           console.error(`   Current Local: ${systemTime.toString()}`);
           console.error(`   Timestamp: ${Date.now()}`);
-          console.error(`   Year: ${currentYear}`);
-          console.error(`   Timezone: ${Intl.DateTimeFormat().resolvedOptions().timeZone}`);
+          console.error(`   Year: ${systemTime.getFullYear()}`);
+          console.error(`   Timezone: ${timezone}`);
+          console.error(`   Clock Skew: ${Math.round(timeSkew / 1000)} seconds`);
           
-          // Check if time is the main issue
-          if (Math.abs(currentYear - expectedYear) > 1) {
-            console.error(`\n❌ CRITICAL ISSUE DETECTED: Server time is set to ${currentYear}!`);
+          // Check if clock skew is the main issue
+          if (timeSkew > maxAllowedSkew) {
+            console.error(`\n❌ CRITICAL ISSUE DETECTED: Server time has significant clock skew!`);
+            console.error(`   Clock skew: ${Math.round(timeSkew / 1000)} seconds (max allowed: 300 seconds)`);
             console.error(`   This is DEFINITELY causing the "Invalid JWT" error.`);
-            console.error(`   Firebase JWT tokens require accurate system time.`);
+            console.error(`   Firebase JWT tokens require accurate system time (within ~5 minutes).`);
             console.error(`\n   🔧 IMMEDIATE FIX REQUIRED:`);
             console.error(`   On Render/Cloud Hosting:`);
-            console.error(`   1. Check server timezone in hosting platform settings`);
-            console.error(`   2. Ensure NTP (Network Time Protocol) is enabled`);
+            console.error(`   1. Ensure NTP (Network Time Protocol) is enabled`);
+            console.error(`   2. Set timezone to UTC (recommended for servers)`);
             console.error(`   3. Restart the server after fixing time`);
             console.error(`\n   After fixing time, restart the backend server.`);
-            console.error(`   The service account key is likely fine - the time issue is the problem.`);
+            console.error(`   The service account key is likely fine - the clock sync issue is the problem.`);
           } else {
             console.error(`\nDiagnosis:`);
             console.error(`   Since Firebase Console testing works, your FCM tokens are valid.`);
-            console.error(`   The issue is likely with the backend service account key or server time.`);
-            console.error(`   "Invalid JWT" usually means:`);
-            console.error(`   1. Server time is significantly off (check above)`);
+            console.error(`   The issue is likely with the backend service account key or clock synchronization.`);
+            console.error(`   "Invalid JWT Signature" usually means:`);
+            console.error(`   1. Server time has clock skew (check above - should be < 5 minutes)`);
             console.error(`   2. Service account key was revoked in Google Cloud Console`);
             console.error(`   3. Service account key is corrupted or incomplete`);
             console.error(`   4. Private key format is wrong (should start with "-----BEGIN PRIVATE KEY-----")`);
+            console.error(`   5. Timezone mismatch (server should use UTC)`);
             
             console.error(`\nSolution:`);
-            console.error(`   1. FIRST: Fix server time if it's wrong (see above)`);
-            console.error(`   2. Go to: https://console.cloud.google.com/iam-admin/serviceaccounts?project=wisdom-7c115`);
-            console.error(`   3. Find: firebase-adminsdk-fbsvc@wisdom-7c115.iam.gserviceaccount.com`);
-            console.error(`   4. Click on it → "Keys" tab`);
-            console.error(`   5. Check if the key exists and is active`);
-            console.error(`   6. If revoked/missing: Generate new key from Firebase Console`);
-            console.error(`   7. Replace chat-backend/firebase-service-account.json`);
-            console.error(`   8. Restart backend server`);
+            console.error(`   1. FIRST: Ensure server time is synced (clock skew < 5 minutes)`);
+            console.error(`   2. Set server timezone to UTC if not already`);
+            console.error(`   3. Go to: https://console.cloud.google.com/iam-admin/serviceaccounts?project=wisdom-7c115`);
+            console.error(`   4. Find: firebase-adminsdk-fbsvc@wisdom-7c115.iam.gserviceaccount.com`);
+            console.error(`   5. Click on it → "Keys" tab`);
+            console.error(`   6. Check if the key exists and is active`);
+            console.error(`   7. If revoked/missing: Generate new key from Firebase Console`);
+            console.error(`   8. Replace chat-backend/firebase-service-account.json`);
+            console.error(`   9. Restart backend server`);
           }
           console.error(`❌ ============================================\n`);
           // Don't try other tokens if credential is invalid

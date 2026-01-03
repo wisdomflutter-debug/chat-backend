@@ -50,35 +50,45 @@ const initializeFirebase = () => {
         const systemTime = new Date();
         const systemTimeMs = systemTime.getTime();
         const currentYear = systemTime.getFullYear();
-        const expectedYear = 2024; // Update this to current year
-        const timeDifference = Math.abs(systemTimeMs - Date.now()); // Should be ~0
+        const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
         
         console.log(`\n⏰ System Time Check:`);
         console.log(`   Current UTC: ${systemTime.toISOString()}`);
         console.log(`   Current Local: ${systemTime.toString()}`);
         console.log(`   Timestamp: ${systemTimeMs}`);
         console.log(`   Year: ${currentYear}`);
+        console.log(`   Timezone: ${timezone}`);
         
-        // Check if year is significantly off (more than 1 year difference)
-        if (Math.abs(currentYear - expectedYear) > 1) {
-          console.error(`\n❌ CRITICAL: System time is set to ${currentYear} (expected ~${expectedYear})!`);
+        // Check for clock skew issues (Firebase JWT requires accurate time within ~5 minutes)
+        // Get a reference time from a reliable source (using Date.now() which should be accurate)
+        const now = Date.now();
+        const timeSkew = Math.abs(systemTimeMs - now);
+        
+        // Firebase JWT tokens are valid for 1 hour, but clock skew of more than 5 minutes can cause issues
+        const maxAllowedSkew = 5 * 60 * 1000; // 5 minutes in milliseconds
+        
+        if (timeSkew > maxAllowedSkew) {
+          console.error(`\n❌ CRITICAL: System time appears to have significant clock skew!`);
+          console.error(`   Time difference: ${Math.round(timeSkew / 1000)} seconds`);
+          console.error(`   Firebase JWT requires accurate time (within ~5 minutes of actual time)`);
           console.error(`   This WILL cause Firebase JWT validation to fail with "Invalid JWT" error.`);
-          console.error(`   Firebase JWT tokens use system time - if clock is wrong, tokens are invalid.`);
           console.error(`\n   🔧 FIX SERVER TIME:`);
           console.error(`   On Render/Cloud Hosting:`);
-          console.error(`   1. Check server timezone settings in hosting platform`);
-          console.error(`   2. Ensure NTP (Network Time Protocol) is enabled`);
+          console.error(`   1. Ensure NTP (Network Time Protocol) is enabled`);
+          console.error(`   2. Set timezone to UTC (recommended for servers)`);
           console.error(`   3. Restart the server after fixing time`);
-          console.error(`\n   Local Development:`);
-          console.error(`   macOS: System Preferences → Date & Time → Set automatically`);
-          console.error(`   Or run: sudo sntp -sS time.apple.com`);
-          console.error(`   Linux: sudo timedatectl set-ntp true`);
-          console.error(`   Windows: Settings → Time & Language → Sync now`);
-          console.error(`\n   ⚠️  Firebase will NOT work until server time is corrected!`);
-        } else if (timeDifference > 60000) { // More than 1 minute difference
-          console.warn(`\n⚠️  WARNING: System time may be slightly off (${Math.round(timeDifference/1000)}s difference)`);
+          console.error(`\n   ⚠️  Firebase will NOT work until server time is synchronized!`);
+        } else if (timeSkew > 60000) { // More than 1 minute difference
+          console.warn(`\n⚠️  WARNING: System time may have slight clock skew (${Math.round(timeSkew / 1000)}s)`);
           console.warn(`   This might cause intermittent JWT validation issues.`);
-          console.warn(`   Consider syncing your system time.`);
+          console.warn(`   Consider ensuring NTP sync is enabled.`);
+        }
+        
+        // Warn about timezone if not UTC (UTC is recommended for servers)
+        if (timezone !== 'UTC' && !timezone.includes('GMT')) {
+          console.warn(`\n⚠️  NOTE: Server timezone is ${timezone} (not UTC)`);
+          console.warn(`   UTC is recommended for servers to avoid timezone-related issues.`);
+          console.warn(`   Firebase JWT uses UTC internally, so timezone shouldn't cause issues, but UTC is best practice.`);
         }
         
         // Try to initialize
