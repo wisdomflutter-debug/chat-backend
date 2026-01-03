@@ -285,12 +285,18 @@ const setupSocketIO = (io) => {
                 }
               }
             } else if (updatedRoom.type === 'group' && updatedRoom.participants) {
-              // For group chats, get online status for all participants
+              // For group chats, get online status for all participants (excluding sender)
               const participantsStatus = {};
               let onlineCount = 0;
               
               for (const participantId of updatedRoom.participants) {
                 const participantIdStr = String(participantId);
+                
+                // Skip sender - don't count self as online
+                if (participantIdStr === actualSenderId) {
+                  continue;
+                }
+                
                 const participant = await User.findOne({
                   $or: [
                     { empId: participantIdStr },
@@ -311,10 +317,13 @@ const setupSocketIO = (io) => {
                 }
               }
               
+              // Total count excludes sender
+              const totalCountExcludingSelf = updatedRoom.participants.length - 1;
+              
               participantsOnlineStatus = {
                 participants: participantsStatus,
                 onlineCount: onlineCount,
-                totalCount: updatedRoom.participants.length
+                totalCount: totalCountExcludingSelf
               };
             }
 
@@ -727,6 +736,97 @@ const setupSocketIO = (io) => {
             };
             io.emit('user-status', statusUpdate);
             console.log(`✅ User ${user.empId} status broadcasted to ${connectedSockets.length} connected client(s) - isOnline: true`);
+            
+            // Emit room-updated events for all group chats this user is in
+            // This ensures chat list updates instantly when users go online/offline
+            try {
+              const userRooms = await ChatRoom.find({
+                type: 'group',
+                participants: { $in: [String(user.empId), user.loginId].filter(Boolean) }
+              }).lean();
+              
+              for (const room of userRooms) {
+                const participantsStr = room.participants.map(p => String(p));
+                const participantsStatus = {};
+                let onlineCount = 0;
+                
+                for (const participantId of participantsStr) {
+                  const participantIdStr = String(participantId);
+                  
+                  // Skip current user - don't count self as online
+                  if (participantIdStr === String(user.empId)) {
+                    continue;
+                  }
+                  
+                  const participant = await User.findOne({
+                    $or: [
+                      { empId: participantIdStr },
+                      { loginId: participantIdStr }
+                    ]
+                  }).select('empId loginId name isOnline').lean();
+                  
+                  if (participant) {
+                    const isOnline = participant.isOnline || false;
+                    participantsStatus[participantIdStr] = {
+                      empId: String(participant.empId),
+                      name: participant.name,
+                      isOnline: isOnline
+                    };
+                    if (isOnline) {
+                      onlineCount++;
+                    }
+                  }
+                }
+                
+                const totalCountExcludingSelf = participantsStr.length - 1;
+                const participantsOnlineStatus = {
+                  participants: participantsStatus,
+                  onlineCount: onlineCount,
+                  totalCount: totalCountExcludingSelf
+                };
+                
+                // Convert unreadCount Map to object
+                const unreadCountObj = {};
+                if (room.unreadCount && room.unreadCount instanceof Map) {
+                  room.unreadCount.forEach((value, key) => {
+                    unreadCountObj[String(key)] = value;
+                  });
+                } else if (room.unreadCount && typeof room.unreadCount === 'object') {
+                  Object.assign(unreadCountObj, room.unreadCount);
+                }
+                
+                const roomUpdateData = {
+                  id: String(room._id),
+                  type: room.type,
+                  participants: participantsStr,
+                  name: room.name,
+                  description: room.description,
+                  hrEmpId: room.hrEmpId ? String(room.hrEmpId) : null,
+                  lineWorkerEmpId: room.lineWorkerEmpId ? String(room.lineWorkerEmpId) : null,
+                  createdBy: String(room.createdBy),
+                  otherUser: null,
+                  participantsOnlineStatus: participantsOnlineStatus,
+                  lastMessage: room.lastMessage ? {
+                    messageId: room.lastMessage.messageId ? String(room.lastMessage.messageId._id || room.lastMessage.messageId) : null,
+                    text: room.lastMessage.text || '',
+                    sentBy: room.lastMessage.sentBy ? String(room.lastMessage.sentBy) : null,
+                    sentAt: room.lastMessage.sentAt ? room.lastMessage.sentAt.toISOString() : null
+                  } : null,
+                  unreadCount: unreadCountObj,
+                  createdAt: room.createdAt ? room.createdAt.toISOString() : null,
+                  updatedAt: room.updatedAt ? room.updatedAt.toISOString() : null
+                };
+                
+                // Emit to all participants of this group
+                io.to(String(room._id)).emit('room-updated', roomUpdateData);
+              }
+              
+              if (userRooms.length > 0) {
+                console.log(`✅ Emitted room-updated for ${userRooms.length} group chat(s) after user ${user.empId} went online`);
+              }
+            } catch (roomUpdateError) {
+              console.error('Error emitting room-updated for groups after user-online:', roomUpdateError);
+            }
           }
         } else {
           console.warn(`❌ User not found for empId/loginId in user-online event: ${empIdStr}`);
@@ -763,6 +863,97 @@ const setupSocketIO = (io) => {
                   isOnline: false
                 });
                 console.log(`✅ User ${user.empId} status broadcasted to ${connectedSockets.length} connected client(s) - isOnline: false`);
+                
+                // Emit room-updated events for all group chats this user is in
+                // This ensures chat list updates instantly when users go offline
+                try {
+                  const userRooms = await ChatRoom.find({
+                    type: 'group',
+                    participants: { $in: [String(user.empId), user.loginId].filter(Boolean) }
+                  }).lean();
+                  
+                  for (const room of userRooms) {
+                    const participantsStr = room.participants.map(p => String(p));
+                    const participantsStatus = {};
+                    let onlineCount = 0;
+                    
+                    for (const participantId of participantsStr) {
+                      const participantIdStr = String(participantId);
+                      
+                      // Skip current user - don't count self as online
+                      if (participantIdStr === String(user.empId)) {
+                        continue;
+                      }
+                      
+                      const participant = await User.findOne({
+                        $or: [
+                          { empId: participantIdStr },
+                          { loginId: participantIdStr }
+                        ]
+                      }).select('empId loginId name isOnline').lean();
+                      
+                      if (participant) {
+                        const isOnline = participant.isOnline || false;
+                        participantsStatus[participantIdStr] = {
+                          empId: String(participant.empId),
+                          name: participant.name,
+                          isOnline: isOnline
+                        };
+                        if (isOnline) {
+                          onlineCount++;
+                        }
+                      }
+                    }
+                    
+                    const totalCountExcludingSelf = participantsStr.length - 1;
+                    const participantsOnlineStatus = {
+                      participants: participantsStatus,
+                      onlineCount: onlineCount,
+                      totalCount: totalCountExcludingSelf
+                    };
+                    
+                    // Convert unreadCount Map to object
+                    const unreadCountObj = {};
+                    if (room.unreadCount && room.unreadCount instanceof Map) {
+                      room.unreadCount.forEach((value, key) => {
+                        unreadCountObj[String(key)] = value;
+                      });
+                    } else if (room.unreadCount && typeof room.unreadCount === 'object') {
+                      Object.assign(unreadCountObj, room.unreadCount);
+                    }
+                    
+                    const roomUpdateData = {
+                      id: String(room._id),
+                      type: room.type,
+                      participants: participantsStr,
+                      name: room.name,
+                      description: room.description,
+                      hrEmpId: room.hrEmpId ? String(room.hrEmpId) : null,
+                      lineWorkerEmpId: room.lineWorkerEmpId ? String(room.lineWorkerEmpId) : null,
+                      createdBy: String(room.createdBy),
+                      otherUser: null,
+                      participantsOnlineStatus: participantsOnlineStatus,
+                      lastMessage: room.lastMessage ? {
+                        messageId: room.lastMessage.messageId ? String(room.lastMessage.messageId._id || room.lastMessage.messageId) : null,
+                        text: room.lastMessage.text || '',
+                        sentBy: room.lastMessage.sentBy ? String(room.lastMessage.sentBy) : null,
+                        sentAt: room.lastMessage.sentAt ? room.lastMessage.sentAt.toISOString() : null
+                      } : null,
+                      unreadCount: unreadCountObj,
+                      createdAt: room.createdAt ? room.createdAt.toISOString() : null,
+                      updatedAt: room.updatedAt ? room.updatedAt.toISOString() : null
+                    };
+                    
+                    // Emit to all participants of this group
+                    io.to(String(room._id)).emit('room-updated', roomUpdateData);
+                  }
+                  
+                  if (userRooms.length > 0) {
+                    console.log(`✅ Emitted room-updated for ${userRooms.length} group chat(s) after user ${user.empId} went offline`);
+                  }
+                } catch (roomUpdateError) {
+                  console.error('Error emitting room-updated for groups after user-offline:', roomUpdateError);
+                }
               }
             }
           }

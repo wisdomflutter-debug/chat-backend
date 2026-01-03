@@ -117,13 +117,20 @@ const getChatRooms = async (req, res, next) => {
       rooms.map(async (room) => {
         // Handle group chats differently
         if (room.type === 'group') {
-          // For group chats, get online status for all participants
+          // For group chats, get online status for all participants (excluding current user)
           const participantsStr = room.participants.map(p => String(p));
+          const currentEmpIdStr = String(empId);
           const participantsStatus = {};
           let onlineCount = 0;
           
           for (const participantId of participantsStr) {
             const participantIdStr = String(participantId);
+            
+            // Skip current user - don't count self as online
+            if (participantIdStr === currentEmpIdStr) {
+              continue;
+            }
+            
             const participant = await User.findOne({
               $or: [
                 { empId: participantIdStr },
@@ -144,10 +151,13 @@ const getChatRooms = async (req, res, next) => {
             }
           }
           
+          // Total count excludes current user
+          const totalCountExcludingSelf = participantsStr.length - 1;
+          
           const participantsOnlineStatus = {
             participants: participantsStatus,
             onlineCount: onlineCount,
-            totalCount: participantsStr.length
+            totalCount: totalCountExcludingSelf
           };
           
           // For group chats, return room info with participantsOnlineStatus
