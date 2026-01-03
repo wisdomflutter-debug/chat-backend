@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: hr-chat-backend
+    env: node
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: HOST
+        value: 0.0.0.0
+      - key: CORS_ORIGIN
+        value: "*"
+      - key: SEND_NOTIFICATIONS_TO_ONLINE_USERS
+        value: "true"
+      # Add your MongoDB URI here or in Render dashboard
+      - key: MONGODB_URI
+        sync: false  # Set this manually in Render dashboard for security
+

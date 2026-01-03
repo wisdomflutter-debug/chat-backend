@@ -1,0 +1,14 @@
+node_modules/
+.env
+.env.local
+firebase-service-account.json
+*.log
+.DS_Store
+dist/
+build/
+coverage/
+
+# Keep .env.example for reference
+!.env.example
+
+

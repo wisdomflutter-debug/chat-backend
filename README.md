@@ -2,6 +2,15 @@
 
 Node.js backend for real-time chat between HR and Line Workers.
 
+## 🚀 Quick Deploy (Free Hosting)
+
+**Want to deploy for free?** See:
+- **[QUICK_DEPLOY.md](./QUICK_DEPLOY.md)** - 5-minute deployment guide ⭐ (Recommended)
+- **[FREE_HOSTING_GUIDE.md](./FREE_HOSTING_GUIDE.md)** - Complete hosting options
+- **[DEPLOYMENT_CHECKLIST.md](./DEPLOYMENT_CHECKLIST.md)** - Step-by-step checklist
+
+**Recommended**: Render (easiest, free tier available)
+
 ## Features
 
 - ✅ Real-time messaging with Socket.io

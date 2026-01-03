@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  chat-backend:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./firebase-service-account.json:/app/firebase-service-account.json:ro
+      - ./uploads:/app/uploads
+    environment:
+      - NODE_ENV=production
+    # Docker containers automatically sync time with host
+    # But you can also force NTP sync
+    command: sh -c "apk add --no-cache tzdata && npm start"
+
