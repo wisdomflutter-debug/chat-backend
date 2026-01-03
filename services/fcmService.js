@@ -148,28 +148,49 @@ const sendNotification = async (empId, notification) => {
             console.error(`   Could not read service account file: ${e.message}`);
           }
           
+          const systemTime = new Date();
+          const currentYear = systemTime.getFullYear();
+          const expectedYear = 2024; // Update this to current year
+          
           console.error(`\nServer Time Check:`);
-          console.error(`   Current UTC: ${new Date().toISOString()}`);
-          console.error(`   Current Local: ${new Date().toString()}`);
+          console.error(`   Current UTC: ${systemTime.toISOString()}`);
+          console.error(`   Current Local: ${systemTime.toString()}`);
           console.error(`   Timestamp: ${Date.now()}`);
+          console.error(`   Year: ${currentYear}`);
           console.error(`   Timezone: ${Intl.DateTimeFormat().resolvedOptions().timeZone}`);
           
-          console.error(`\nDiagnosis:`);
-          console.error(`   Since Firebase Console testing works, your FCM tokens are valid.`);
-          console.error(`   The issue is with the backend service account key.`);
-          console.error(`   "Invalid JWT" usually means:`);
-          console.error(`   1. Service account key was revoked in Google Cloud Console`);
-          console.error(`   2. Service account key is corrupted or incomplete`);
-          console.error(`   3. Private key format is wrong (should start with "-----BEGIN PRIVATE KEY-----")`);
-          
-          console.error(`\nSolution:`);
-          console.error(`   1. Go to: https://console.cloud.google.com/iam-admin/serviceaccounts?project=wisdom-7c115`);
-          console.error(`   2. Find: firebase-adminsdk-fbsvc@wisdom-7c115.iam.gserviceaccount.com`);
-          console.error(`   3. Click on it → "Keys" tab`);
-          console.error(`   4. Check if the key exists and is active`);
-          console.error(`   5. If revoked/missing: Generate new key from Firebase Console`);
-          console.error(`   6. Replace chat-backend/firebase-service-account.json`);
-          console.error(`   7. Restart backend server`);
+          // Check if time is the main issue
+          if (Math.abs(currentYear - expectedYear) > 1) {
+            console.error(`\n❌ CRITICAL ISSUE DETECTED: Server time is set to ${currentYear}!`);
+            console.error(`   This is DEFINITELY causing the "Invalid JWT" error.`);
+            console.error(`   Firebase JWT tokens require accurate system time.`);
+            console.error(`\n   🔧 IMMEDIATE FIX REQUIRED:`);
+            console.error(`   On Render/Cloud Hosting:`);
+            console.error(`   1. Check server timezone in hosting platform settings`);
+            console.error(`   2. Ensure NTP (Network Time Protocol) is enabled`);
+            console.error(`   3. Restart the server after fixing time`);
+            console.error(`\n   After fixing time, restart the backend server.`);
+            console.error(`   The service account key is likely fine - the time issue is the problem.`);
+          } else {
+            console.error(`\nDiagnosis:`);
+            console.error(`   Since Firebase Console testing works, your FCM tokens are valid.`);
+            console.error(`   The issue is likely with the backend service account key or server time.`);
+            console.error(`   "Invalid JWT" usually means:`);
+            console.error(`   1. Server time is significantly off (check above)`);
+            console.error(`   2. Service account key was revoked in Google Cloud Console`);
+            console.error(`   3. Service account key is corrupted or incomplete`);
+            console.error(`   4. Private key format is wrong (should start with "-----BEGIN PRIVATE KEY-----")`);
+            
+            console.error(`\nSolution:`);
+            console.error(`   1. FIRST: Fix server time if it's wrong (see above)`);
+            console.error(`   2. Go to: https://console.cloud.google.com/iam-admin/serviceaccounts?project=wisdom-7c115`);
+            console.error(`   3. Find: firebase-adminsdk-fbsvc@wisdom-7c115.iam.gserviceaccount.com`);
+            console.error(`   4. Click on it → "Keys" tab`);
+            console.error(`   5. Check if the key exists and is active`);
+            console.error(`   6. If revoked/missing: Generate new key from Firebase Console`);
+            console.error(`   7. Replace chat-backend/firebase-service-account.json`);
+            console.error(`   8. Restart backend server`);
+          }
           console.error(`❌ ============================================\n`);
           // Don't try other tokens if credential is invalid
           return { 

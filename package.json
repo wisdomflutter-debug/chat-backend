@@ -9,7 +9,12 @@
     "test": "jest",
     "deploy:render": "echo 'Deploy to Render: Push to GitHub and connect in Render dashboard'"
   },
-  "keywords": ["chat", "hr", "socket.io", "mongodb"],
+  "keywords": [
+    "chat",
+    "hr",
+    "socket.io",
+    "mongodb"
+  ],
   "author": "",
   "license": "ISC",
   "dependencies": {
@@ -29,5 +34,3 @@
     "nodemon": "^3.0.1"
   }
 }
-
-
