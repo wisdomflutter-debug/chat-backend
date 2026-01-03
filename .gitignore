@@ -1,6 +1,6 @@
 node_modules/
 .env.local
-# firebase-service-account.json  # Temporarily commented for testing on Render
+firebase-service-account.json
 *.log
 .DS_Store
 dist/
