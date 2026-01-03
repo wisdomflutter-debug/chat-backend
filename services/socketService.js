@@ -645,7 +645,9 @@ const setupSocketIO = (io) => {
             }
             
             if (isParticipant) {
-              // Mark all messages sent by others as read
+              const readAt = new Date();
+              
+              // Mark all unread messages sent by others as read in a single efficient operation
               const updateResult = await Message.updateMany(
                 {
                   roomId,
@@ -656,41 +658,30 @@ const setupSocketIO = (io) => {
                   $push: {
                     readBy: {
                       empId: userEmpId,
-                      readAt: new Date()
+                      readAt: readAt
                     }
                   }
                 }
               );
               
-              console.log(`🔵 DEBUG Socket: Marked ${updateResult.modifiedCount} messages as read for user ${userEmpId} in room ${roomId}`);
+              const markedCount = updateResult.modifiedCount;
               
-              // Fetch all messages that were just marked as read and emit individual read receipts
-              // This ensures the UI updates with read status for each message
-              const markedMessages = await Message.find({
-                roomId,
-                senderId: { $ne: userEmpId },
-                'readBy.empId': userEmpId
-              }).select('_id').lean();
-              
-              const readAt = new Date();
-              // Emit individual message-read events for each message
-              for (const msg of markedMessages) {
-                io.to(roomId).emit('message-read', {
-                  messageId: String(msg._id),
-                  empId: userEmpId,
-                  readAt: readAt.toISOString()
-                });
-              }
-              
-              // Also emit messages-read for bulk update
+              // Reset unread count for the user
               await room.resetUnread(userEmpId);
+              
+              // Emit single bulk messages-read event (more efficient than individual events)
+              // Frontend can update all messages in the room as read based on this event
               io.to(roomId).emit('messages-read', {
                 roomId,
                 empId: userEmpId,
-                readAt: readAt.toISOString()
+                readAt: readAt.toISOString(),
+                messageCount: markedCount
               });
               
-              console.log(`🔵 DEBUG Socket: Emitted ${markedMessages.length} message-read events and 1 messages-read event for room ${roomId}`);
+              // Only log if messages were actually marked (avoid spam in logs)
+              if (markedCount > 0) {
+                console.log(`✅ Marked ${markedCount} messages as read for user ${userEmpId} in room ${roomId}`);
+              }
             }
           }
         }
