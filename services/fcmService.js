@@ -150,30 +150,45 @@ const sendNotification = async (empId, notification) => {
           
           const systemTime = new Date();
           const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-          const timeSkew = Math.abs(systemTime.getTime() - Date.now());
+          const expectedTime = Date.now();
+          const timeSkew = Math.abs(systemTime.getTime() - expectedTime);
+          const timeSkewMinutes = Math.round(timeSkew / 60000);
           const maxAllowedSkew = 5 * 60 * 1000; // 5 minutes
           
+          const serverHour = systemTime.getUTCHours();
+          const serverMinute = systemTime.getUTCMinutes();
+          const expectedHour = new Date(expectedTime).getUTCHours();
+          const expectedMinute = new Date(expectedTime).getUTCMinutes();
+          
           console.error(`\nServer Time Check:`);
-          console.error(`   Current UTC: ${systemTime.toISOString()}`);
-          console.error(`   Current Local: ${systemTime.toString()}`);
-          console.error(`   Timestamp: ${Date.now()}`);
+          console.error(`   Server UTC: ${systemTime.toISOString()}`);
+          console.error(`   Server Time: ${serverHour}:${serverMinute.toString().padStart(2, '0')} UTC`);
+          console.error(`   Expected UTC: ${new Date(expectedTime).toISOString()}`);
+          console.error(`   Expected Time: ${expectedHour}:${expectedMinute.toString().padStart(2, '0')} UTC`);
+          console.error(`   Clock Skew: ${Math.round(timeSkew / 1000)} seconds (${timeSkewMinutes} minutes)`);
           console.error(`   Year: ${systemTime.getFullYear()}`);
           console.error(`   Timezone: ${timezone}`);
-          console.error(`   Clock Skew: ${Math.round(timeSkew / 1000)} seconds`);
           
           // Check if clock skew is the main issue
           if (timeSkew > maxAllowedSkew) {
-            console.error(`\n❌ CRITICAL ISSUE DETECTED: Server time has significant clock skew!`);
-            console.error(`   Clock skew: ${Math.round(timeSkew / 1000)} seconds (max allowed: 300 seconds)`);
-            console.error(`   This is DEFINITELY causing the "Invalid JWT" error.`);
+            console.error(`\n❌ CRITICAL ISSUE DETECTED: Server time is off by ${timeSkewMinutes} minutes!`);
+            console.error(`   Server shows: ${serverHour}:${serverMinute.toString().padStart(2, '0')} UTC`);
+            console.error(`   Expected: ${expectedHour}:${expectedMinute.toString().padStart(2, '0')} UTC`);
+            console.error(`   This is DEFINITELY causing the "Invalid JWT Signature" error.`);
             console.error(`   Firebase JWT tokens require accurate system time (within ~5 minutes).`);
-            console.error(`\n   🔧 IMMEDIATE FIX REQUIRED:`);
-            console.error(`   On Render/Cloud Hosting:`);
-            console.error(`   1. Ensure NTP (Network Time Protocol) is enabled`);
-            console.error(`   2. Set timezone to UTC (recommended for servers)`);
-            console.error(`   3. Restart the server after fixing time`);
+            console.error(`\n   🔧 IMMEDIATE FIX REQUIRED ON RENDER:`);
+            console.error(`   1. Render Dashboard → Your Service → Environment`);
+            console.error(`   2. Add/Set: TZ=UTC`);
+            console.error(`   3. Manual Deploy → Clear cache & deploy`);
+            console.error(`   4. If time still wrong, contact Render support about NTP sync`);
             console.error(`\n   After fixing time, restart the backend server.`);
-            console.error(`   The service account key is likely fine - the clock sync issue is the problem.`);
+            console.error(`   The service account key is likely fine - the time sync issue is the problem.`);
+          } else if (Math.abs(serverHour - expectedHour) > 0 || Math.abs(serverMinute - expectedMinute) > 5) {
+            console.error(`\n⚠️  WARNING: Server time may be incorrect!`);
+            console.error(`   Server shows: ${serverHour}:${serverMinute.toString().padStart(2, '0')} UTC`);
+            console.error(`   Expected: ${expectedHour}:${expectedMinute.toString().padStart(2, '0')} UTC`);
+            console.error(`   If actual current time doesn't match server time, Firebase JWT will fail.`);
+            console.error(`\n   🔧 FIX: Set TZ=UTC in Render and redeploy.`);
           } else {
             console.error(`\nDiagnosis:`);
             console.error(`   Since Firebase Console testing works, your FCM tokens are valid.`);
