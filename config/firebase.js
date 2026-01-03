@@ -17,17 +17,59 @@ const initializeFirebase = () => {
   }
 
   try {
-    // Check if service account file exists
-    const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH
-      ? path.resolve(process.env.FIREBASE_SERVICE_ACCOUNT_PATH)
-      : path.join(__dirname, '../firebase-service-account.json');
+    let serviceAccount = null;
+    let serviceAccountSource = null;
 
-    // Try to initialize with service account file
-    if (fs.existsSync(serviceAccountPath)) {
+    // Option 1: Check for base64 encoded JSON in environment variable (most secure for Render)
+    if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
       try {
-        // Read and parse the JSON file
-        const serviceAccountJson = fs.readFileSync(serviceAccountPath, 'utf8');
-        const serviceAccount = JSON.parse(serviceAccountJson);
+        const base64Key = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+        const jsonString = Buffer.from(base64Key, 'base64').toString('utf-8');
+        serviceAccount = JSON.parse(jsonString);
+        serviceAccountSource = 'environment variable (FIREBASE_SERVICE_ACCOUNT_JSON)';
+        console.log('📋 Using Firebase service account from environment variable');
+      } catch (e) {
+        console.error('❌ Error parsing FIREBASE_SERVICE_ACCOUNT_JSON:', e.message);
+        console.error('   Make sure it\'s base64 encoded JSON');
+      }
+    }
+
+    // Option 2: Check for file path in environment variable
+    if (!serviceAccount && process.env.FIREBASE_SERVICE_ACCOUNT_PATH) {
+      const serviceAccountPath = path.resolve(process.env.FIREBASE_SERVICE_ACCOUNT_PATH);
+      if (fs.existsSync(serviceAccountPath)) {
+        try {
+          const serviceAccountJson = fs.readFileSync(serviceAccountPath, 'utf8');
+          serviceAccount = JSON.parse(serviceAccountJson);
+          serviceAccountSource = `file (${serviceAccountPath})`;
+          console.log(`📋 Using Firebase service account from: ${serviceAccountPath}`);
+        } catch (e) {
+          console.error(`❌ Error reading service account file: ${e.message}`);
+        }
+      } else {
+        console.warn(`⚠️  Service account file not found at: ${serviceAccountPath}`);
+      }
+    }
+
+    // Option 3: Check default location
+    if (!serviceAccount) {
+      const defaultPath = path.join(__dirname, '../firebase-service-account.json');
+      if (fs.existsSync(defaultPath)) {
+        try {
+          const serviceAccountJson = fs.readFileSync(defaultPath, 'utf8');
+          serviceAccount = JSON.parse(serviceAccountJson);
+          serviceAccountSource = `file (${defaultPath})`;
+          console.log(`📋 Using Firebase service account from default location: ${defaultPath}`);
+        } catch (e) {
+          console.error(`❌ Error reading service account file: ${e.message}`);
+        }
+      }
+    }
+
+    // If we have a service account, proceed with initialization
+    if (serviceAccount) {
+      try {
+        // Service account already loaded from one of the sources above
 
         // Verify service account structure
         if (!serviceAccount.project_id) {
@@ -145,7 +187,7 @@ const initializeFirebase = () => {
 
           firebaseInitialized = true;
           console.log('✅ Firebase Admin SDK initialized successfully');
-          console.log(`   Service account file: ${serviceAccountPath}`);
+          console.log(`   Service account source: ${serviceAccountSource}`);
           console.log(`   Firebase app name: ${admin.apps[0].name}`);
 
           // Try to validate credentials by getting a token (this will fail if key is invalid)
@@ -192,16 +234,23 @@ const initializeFirebase = () => {
         return null;
       }
     } else {
-      // For development, you can use environment variables
-      // Or initialize without credentials (not recommended for production)
-      console.warn('⚠️  Firebase service account file not found.');
-      console.warn(`   Expected location: ${serviceAccountPath}`);
+      // No service account found from any source
+      console.warn('⚠️  Firebase service account not found.');
       console.warn('   FCM notifications will not work.');
-      console.warn('   To enable FCM notifications:');
-      console.warn('   1. Download service account JSON from Firebase Console');
-      console.warn('   2. Place it in chat-backend/ as firebase-service-account.json');
-      console.warn('   3. Or set FIREBASE_SERVICE_ACCOUNT_PATH in .env');
-      firebaseInitialized = false; // Don't mark as initialized if file is missing
+      console.warn('\n   To enable FCM notifications, use ONE of these methods:');
+      console.warn('\n   Method 1: Environment Variable (Recommended for Render):');
+      console.warn('   1. Convert key to base64: cat firebase-service-account.json | base64');
+      console.warn('   2. Render Dashboard → Environment → Add:');
+      console.warn('      Key: FIREBASE_SERVICE_ACCOUNT_JSON');
+      console.warn('      Value: (paste base64 string)');
+      console.warn('\n   Method 2: File Path:');
+      console.warn('   1. Upload file to Render');
+      console.warn('   2. Render Dashboard → Environment → Add:');
+      console.warn('      Key: FIREBASE_SERVICE_ACCOUNT_PATH');
+      console.warn('      Value: /app/firebase-service-account.json');
+      console.warn('\n   Method 3: Default Location (Local Development):');
+      console.warn('   1. Place file in: chat-backend/firebase-service-account.json');
+      firebaseInitialized = false;
       return null;
     }
   } catch (error) {
