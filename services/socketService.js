@@ -700,6 +700,62 @@ const setupSocketIO = (io) => {
       }
     });
 
+    // Handle new chat/group notification
+    socket.on('new-chat', async (data) => {
+      try {
+        const { roomId, type, participants, name } = data;
+        
+        if (!roomId || !type || !participants || !Array.isArray(participants)) {
+          socket.emit('error', { message: 'roomId, type, and participants array are required' });
+          return;
+        }
+
+        // Get the room to verify it exists
+        const room = await ChatRoom.findById(roomId);
+        if (!room) {
+          socket.emit('error', { message: 'Room not found' });
+          return;
+        }
+
+        // Find all online users who are participants
+        const onlineUsers = await User.find({
+          $or: participants.map(p => ({ empId: String(p) })).concat(
+            participants.map(p => ({ loginId: String(p) }))
+          ),
+          isOnline: true
+        });
+
+        // Emit new-chat event to all online participants (except the sender)
+        const senderEmpId = String(socket.empId);
+        for (const user of onlineUsers) {
+          const userEmpId = String(user.empId);
+          if (userEmpId !== senderEmpId) {
+            // Find the socket for this user
+            const userSockets = Array.from(io.sockets.sockets.values()).filter(
+              s => {
+                const sEmpId = String(s.empId || '');
+                return sEmpId === userEmpId || sEmpId === String(user.loginId || '');
+              }
+            );
+            
+            for (const userSocket of userSockets) {
+              userSocket.emit('new-chat', {
+                roomId,
+                type,
+                name: name || room.name,
+                participants: participants.map(p => String(p)),
+              });
+            }
+          }
+        }
+
+        console.log(`✅ New ${type} chat notification sent to ${onlineUsers.length} online participant(s)`);
+      } catch (error) {
+        console.error('Error handling new-chat event:', error);
+        socket.emit('error', { message: 'Failed to notify new chat' });
+      }
+    });
+
     // User online status - called on login/connect
     socket.on('user-online', async (data) => {
       try {
